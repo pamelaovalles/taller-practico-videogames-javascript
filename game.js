@@ -1,59 +1,179 @@
 const canvas = document.querySelector("#game");
-
 const game = canvas.getContext("2d");
-
-window.addEventListener("load", setCanvasSize);
-//hay que usar este evento resize, porque canvas no recarga la pagina automaticamente
-window.addEventListener("resize", setCanvasSize);
+const btnUp = document.querySelector("#btn-up");
+const btnLeft = document.querySelector("#btn-left");
+const btnRight = document.querySelector("#btn-right");
+const btnDown = document.querySelector("#btn-down");
 
 //VARIABLES
 let canvasSize;
-let canvasElementsSize;
+let elementsSize;
+let level = 0;
+let enemyPositions = [];
 
-//para inicializar lo que se necesita al inicio del juego
-function startGame() {
-  canvas.setAttribute("width", canvasSize);
-  canvas.setAttribute("height", canvasSize);
-
-  //font siver para modificar el estilo de la letra, funciona como un atributo no como un metodo EJ:  game.font = "25px sanserif";
-  game.font = `${canvasElementsSize}px Verdana`;
-
-  //textAlign: sirve para alinear el texto, dependiendo de las coordenadas especificadas con fillText, ej: textAlign = "start" se alinea iniciando desde las coordenadas del fillText en este caso 100,100
-  game.textAlign = "end";
-
-  const map = maps[0];
-  const mapRows = map.trim().split("\n");
-  const mapRowCols = mapRows.map((row) => row.trim().split(""));
-  console.log({ map, mapRows, mapRowCols });
-  console.log(canvasSize, canvasElementsSize);
-
-  for (let row = 1; row <= 10; row++) {
-    for (let col = 1; col <= 10; col++) {
-      //fillText:sirve para insertar texto, etc, hay que especificarle la posicion donde debe iniciar, nota: se le puede dar estilos como si fuera css con font, fillstyle, etc
-      game.fillText(
-        emojis[mapRowCols[row - 1][col - 1]],
-        canvasElementsSize * col,
-        canvasElementsSize * row
-      );
-    }
-  }
-  //fillRect: define la posicion donde inicia(x, y) y termina (x, y) nuestro trazo, con cordenadas
-  //game.fillRect(0, 0, 100, 100);
-  //clearRect: sirve para borrar un rectangulo desde la posicion inicial (x, y) y termina (x, y)
-  //game.clearRect(0, 0, 50, 50);
-
-  //fillStyle: cambia el color
-  //game.fillStyle = "red";
-}
+const playerPosition = {
+  x: undefined,
+  y: undefined,
+};
+const giftPosition = {
+  x: undefined,
+  y: undefined,
+};
 
 function setCanvasSize() {
-  //window.innerWidth y window.innerHeight: para obtener el ancho de la ventana del dispositivo, mientras que window.innerHeight es para el largo de la ventana o pantalla
   if (window.innerHeight > window.innerWidth) {
     canvasSize = window.innerWidth * 0.8;
   } else {
     canvasSize = window.innerHeight * 0.8;
   }
-  canvasElementsSize = canvasSize / 10;
+
+  canvas.setAttribute("width", canvasSize);
+  canvas.setAttribute("height", canvasSize);
+
+  elementsSize = canvasSize / 10;
 
   startGame();
 }
+
+function startGame() {
+  game.font = elementsSize + "px Verdana";
+  game.textAlign = "end";
+
+  const map = maps[level];
+
+  //para validar que ya se completaron todos los niveles
+  if (!map) {
+    gameWin();
+    return;
+  }
+
+  const mapRows = map.trim().split("\n");
+  //MAP: para crear un array apartir de un array
+  const mapRowCols = mapRows.map((row) => row.trim().split(""));
+
+  //console.log({ map, mapRows, mapRowCols });
+  //console.log({ canvasSize, elementsSize });
+
+  //limpiando el array y el canvas
+  enemyPositions = [];
+  game.clearRect(0, 0, canvasSize, canvasSize);
+
+  //forEach: para recorrer el arreglo
+  mapRowCols.forEach((row, rowI) => {
+    row.forEach((col, colI) => {
+      const emoji = emojis[col];
+      //se suma 1 para que el indice empiece en 1
+      const posX = elementsSize * (colI + 1);
+      const posY = elementsSize * (rowI + 1);
+
+      //la posicion inicial del jugador es donde se encuentra la puerta, en este caso la puerta se representa con el emoji que tiene como valor el caracter O
+      if (col == "O") {
+        if (!playerPosition.x && !playerPosition.y) {
+          playerPosition.x = posX;
+          playerPosition.y = posY;
+          console.log({ playerPosition });
+        }
+      } else if (col == "I") {
+        giftPosition.x = posX;
+        giftPosition.y = posY;
+      } else if (col == "X") {
+        enemyPositions.push({
+          x: posX,
+          y: posY,
+        });
+      }
+
+      game.fillText(emoji, posX, posY);
+    });
+  });
+
+  movePlayer();
+}
+
+function movePlayer() {
+  const giftCollisionX =
+    playerPosition.x.toFixed(3) == giftPosition.x.toFixed(3);
+  const giftCollisionY =
+    playerPosition.y.toFixed(3) == giftPosition.y.toFixed(3);
+  const giftCollision = giftCollisionX && giftCollisionY;
+
+  if (giftCollision) {
+    levelWin();
+  }
+
+  const enemyCollision = enemyPositions.find((enemy) => {
+    const enemyCollisionX = enemy.x.toFixed(3) == playerPosition.x.toFixed(3);
+    const enemyCollisionY = enemy.y.toFixed(3) == playerPosition.y.toFixed(3);
+    return enemyCollisionX && enemyCollisionY;
+  });
+
+  if (enemyCollision) {
+    console.log("Chocaste contra un enemigo :(");
+  }
+
+  game.fillText(emojis["PLAYER"], playerPosition.x, playerPosition.y);
+}
+function levelWin() {
+  console.log("Subiste de nivel");
+  level++;
+  startGame();
+}
+function gameWin() {
+  console.log("¡Terminaste el juego!");
+}
+
+function moveByKeys(event) {
+  if (event.key == "ArrowUp") moveUp();
+  else if (event.key == "ArrowLeft") moveLeft();
+  else if (event.key == "ArrowRight") moveRight();
+  else if (event.key == "ArrowDown") moveDown();
+}
+function moveUp() {
+  //si la resta  es menor que el tamano del elemento (no puede ser < 0, porque el text align es end) nos saca del mapa, es decir no debo seguir moviendome, si es lo contrario puedo seguir moviendome
+  if (playerPosition.y - elementsSize < elementsSize) {
+    console.log("OUT");
+  } else {
+    console.log("Me quiero mover hacia arriba");
+    playerPosition.y -= elementsSize;
+    //startGame:para borrar todo y renderizar el jugador de nuevo
+    startGame();
+  }
+}
+function moveLeft() {
+  if (playerPosition.x - elementsSize < elementsSize) {
+    console.log("OUT");
+  } else {
+    console.log("Me quiero mover hacia izquierda");
+    playerPosition.x -= elementsSize;
+    startGame();
+  }
+}
+function moveRight() {
+  //si la suma  es mayor que el tamano del canvas (no puede ser > 0, porque el text align es end) nos saca del mapa, es decir no debo seguir moviendome, si es lo contrario puedo seguir moviendome
+  if (playerPosition.x + elementsSize > canvasSize) {
+    console.log("OUT");
+  } else {
+    console.log("Me quiero mover hacia derecha");
+    playerPosition.x += elementsSize;
+    startGame();
+  }
+}
+function moveDown() {
+  console.log("Me quiero mover hacia abajo");
+
+  if (playerPosition.y + elementsSize > canvasSize) {
+    console.log("OUT");
+  } else {
+    playerPosition.y += elementsSize;
+    startGame();
+  }
+}
+
+//EVENTS
+window.addEventListener("load", setCanvasSize);
+window.addEventListener("resize", setCanvasSize);
+window.addEventListener("keydown", moveByKeys);
+btnUp.addEventListener("click", moveUp);
+btnLeft.addEventListener("click", moveLeft);
+btnRight.addEventListener("click", moveRight);
+btnDown.addEventListener("click", moveDown);
